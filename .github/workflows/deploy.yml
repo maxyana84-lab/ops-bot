@@ -21,7 +21,7 @@ jobs:
     env:
       NOTIFY_URL: ${{ secrets.OPSBOT_NOTIFY_URL }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Configure kubectl
         run: |
           mkdir -p ~/.kube
