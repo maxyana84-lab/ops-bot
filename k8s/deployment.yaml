@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ops-bot
+  labels:
+    app.kubernetes.io/name: ops-bot
+spec:
+  # Telegram long polling allows only ONE consumer per token: a second pod
+  # gets "409 Conflict". So: a single replica, and Recreate (not RollingUpdate)
+  # so the old pod stops before the new one starts.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ops-bot
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ops-bot
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: /metrics
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: ops-bot
+          image: ghcr.io/OWNER/ops-bot:latest  # replaced by kustomize images / CI
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - secretRef:
+                name: ops-bot
+          env:
+            - name: TARGETS_FILE
+              value: /app/config/targets.yaml
+          volumeMounts:
+            - name: config
+              mountPath: /app/config
+              readOnly: true
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 10
+          resources:
+            requests: {cpu: 20m, memory: 64Mi}
+            limits: {memory: 192Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+      volumes:
+        - name: config
+          configMap:
+            name: ops-bot-targets

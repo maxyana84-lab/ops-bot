@@ -1,0 +1,47 @@
+# Full local demo: ops-bot + Prometheus + Alertmanager.
+# Prometheus scrapes the bot's own /metrics, evaluates alert rules, and
+# Alertmanager delivers firing alerts back to Telegram through the bot's webhook.
+#
+#   cp .env.example .env   # fill in TELEGRAM_TOKEN, WEBHOOK_SECRET, ALERT_CHAT_IDS
+#   docker compose up -d --build
+
+services:
+  ops-bot:
+    build: .
+    image: ops-bot:local
+    env_file: .env
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config:/app/config:ro
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=7d
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alert.rules.yml:/etc/prometheus/alert.rules.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on: [ops-bot, alertmanager]
+    restart: unless-stopped
+
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    # Alertmanager can't read env vars in its config, so the webhook secret is
+    # written to a file that the config references via credentials_file.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        printf '%s' "$$WEBHOOK_SECRET" > /tmp/webhook_secret &&
+        exec /bin/alertmanager --config.file=/etc/alertmanager/alertmanager.yml
+        --storage.path=/alertmanager
+    env_file: .env
+    volumes:
+      - ./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    ports:
+      - "9093:9093"
+    restart: unless-stopped

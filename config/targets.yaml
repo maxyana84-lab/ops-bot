@@ -1,0 +1,13 @@
+# Endpoints the bot checks every CHECK_INTERVAL_SECONDS.
+# A target is reported DOWN after FAILURE_THRESHOLD consecutive failures,
+# and RECOVERED on the first successful check after that.
+targets:
+  - name: GitHub
+    url: https://www.githubstatus.com/api/v2/status.json
+  - name: Google
+    url: https://www.google.com
+    timeout: 3
+  # - name: My API
+  #   url: https://api.example.com/healthz
+  #   expected_status: 200
+  #   timeout: 5

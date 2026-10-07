@@ -1,0 +1,6 @@
+# Targets checked from inside the cluster (in-cluster Services work here too).
+targets:
+  - name: GitHub
+    url: https://www.githubstatus.com/api/v2/status.json
+  # - name: My API (in-cluster)
+  #   url: http://my-api.default.svc.cluster.local:8080/healthz

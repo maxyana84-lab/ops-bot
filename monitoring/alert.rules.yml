@@ -1,0 +1,25 @@
+groups:
+  - name: ops-bot
+    rules:
+      - alert: TargetDown
+        expr: opsbot_target_up == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.target }} has been failing health checks for 2 minutes"
+
+      - alert: TargetSlow
+        expr: opsbot_target_latency_seconds > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.target }} responds in {{ $value | humanizeDuration }}"
+
+      - alert: TelegramSendErrors
+        expr: increase(opsbot_send_errors_total[10m]) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "ops-bot failed to deliver Telegram messages in the last 10 minutes"

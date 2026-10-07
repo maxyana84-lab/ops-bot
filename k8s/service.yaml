@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ops-bot
+  labels:
+    app.kubernetes.io/name: ops-bot
+spec:
+  selector:
+    app.kubernetes.io/name: ops-bot
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

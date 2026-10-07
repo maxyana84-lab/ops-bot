@@ -1,0 +1,46 @@
+# Manual deploy to Kubernetes. Requires repository secrets:
+#   KUBE_CONFIG       - base64-encoded kubeconfig with access to the ops-bot namespace
+#   OPSBOT_NOTIFY_URL - public URL of /webhook/notify (optional)
+#   WEBHOOK_SECRET    - same secret the bot uses (optional, for the notification)
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Image tag to deploy (e.g. sha-1a2b3c4)
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      NOTIFY_URL: ${{ secrets.OPSBOT_NOTIFY_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure kubectl
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
+      - name: Apply manifests
+        run: |
+          cd k8s
+          kustomize edit set image \
+            ghcr.io/OWNER/ops-bot=ghcr.io/${{ github.repository_owner }}/ops-bot:${{ inputs.tag }}
+          kubectl apply -k .
+          kubectl -n ops-bot rollout status deployment/ops-bot --timeout=120s
+      - name: Notify Telegram
+        if: always() && env.NOTIFY_URL != ''
+        env:
+          SECRET: ${{ secrets.WEBHOOK_SECRET }}
+          RESULT: ${{ job.status }}
+        run: |
+          curl -fsS -X POST "$NOTIFY_URL" \
+            -H "Authorization: Bearer $SECRET" -H "Content-Type: application/json" \
+            -d "{\"title\":\"Deploy ops-bot ${{ inputs.tag }}\",\"text\":\"Result: $RESULT\",
+                 \"level\":\"$([ "$RESULT" = success ] && echo success || echo failure)\",
+                 \"url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}"
